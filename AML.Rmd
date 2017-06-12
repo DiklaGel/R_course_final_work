@@ -1,0 +1,171 @@
+---
+title: "AML R Project"
+author: "Dikla Gelbard"
+date: "March 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Statistics of mRNAseq expression and clinical features in Acute myeloid leukemia patients
+
+###Source: LAML project of gdac broad institute: 
+### databases: clinical data and mRNAseq
+
+```{r eval=FALSE}
+#loading the clincal data of AML patients
+clinical_data = read.table("gdac.broadinstitute.org_LAML.Merge_Clinical.Level_1.2016012800.0.0/LAML.clin.merged.txt",sep="\t",quote="",comment="",header=T,na.strings = c("","NA"))
+#first column now would be the colnames of the data frame
+clinical_param = clinical_data$admin.batch_number
+#tranposing the data frame (without the field of admin.batch_number)
+clinical_data = as.data.frame(t(clinical_data[,-1]))
+colnames(clinical_data) = clinical_param
+#writing to csv and importing it after would help us to keep each column as its original class (numeric/factor)
+write.csv(clinical_data, file="clinical_data.csv")
+clinical_data = read.csv(file = "clinical_data.csv", header = T)
+#I choose to represent the rownames by the patient_id (4 digits number)
+rownames(clinical_data) = clinical_data$patient.patient_id
+
+#loading the expression data of AML patients (RNAseq)
+expression_data = read.table("gdac.broadinstitute.org_LAML.Merge_rnaseqv2_RSEM_genes_normalized__data/LAML.rnaseqv2_RSEM_genes_normalized__data.data.txt",sep="\t",quote="",comment="",header=T,na.strings = c("","NA"))
+#first column (Hybridization.REF) would be the colnames of the data frame 
+genes = expression_data$Hybridization.REF
+# transposing the data frame (without the field of Hybridization.REF)
+expression_data = as.data.frame(t(expression_data[,-1]))
+colnames(expression_data) = genes
+#writing to csv and importing it after would help us to keep each column as its original class (numeric/factor)
+write.csv(expression_data, file="expression_data.csv")
+expression_data = read.csv(file = "expression_data.csv", header = T)
+# rownames are 4 digit number: the patient id from the patient barcode
+rownames(expression_data) = substr(expression_data[,1],9,12)
+#removing some genes (not important)
+expression_data = expression_data[,-c(1:20)]
+
+#subset only intersect rows
+inter_rows = intersect(rownames(clinical_data),rownames(expression_data))
+clinical_data = clinical_data[inter_rows,]
+expression_data = expression_data[inter_rows,]
+
+#removing columns with standard deviation = 0
+expression_data = expression_data[,!sapply(expression_data,function(x) sd(x) == 0)]
+
+#saving list of intersting genes (which are known to be related with AML)
+gene_list = c("FLT3LG.2323","FLT3.2322","DNMT3A.1788","TET2.54790","RUNX1.861",
+              "NRAS.4893","CEBPA.1050","NPM1.4869","WT1.7490","TP53AIP1.63970","TP53BP1.7158",
+              "TP53BP2.7159","TP53I11.9537","TP53I13.90313","TP53I3.9540",
+              "TP53INP1.94241","TP53INP2.58476","TP53RK.112858","TP53TG1.11257",
+              "TP53TG3B.729355","TP53TG5.27296","TP53.7157","IDH2.3418","IDH1.3417")
+
+#saving workspace for later 
+save.image(file="clinical_and_expression.RData")
+
+```
+
+
+```{r}
+#loading workspace
+load("clinical_and_expression.RData")
+```
+
+###Dataframes description:
+####Dimensions:
+```{r}
+dim(clinical_data)
+dim(expression_data)
+```
+
+####Snapshot to the dataframes:
+```{r}
+head(clinical_data[,10:25])
+head(expression_data[,10:15])
+```
+
+###Brief intro to clinical data - parameter distribuition:
+```{r warning=FALSE}
+library(ggplot2)
+#I choose some parametrs that interested me
+parameter_list = c("patient.acute_myeloid_leukemia_calgb_cytogenetics_risk_category", "patient.gender", "patient.days_to_death","patient.days_to_birth",  "patient.age_at_initial_pathologic_diagnosis" , "patient.lab_procedure_bone_marrow_blast_cell_outcome_percent_value")
+p = ggplot(data=clinical_data)
+for(param in parameter_list){
+  if(param == "patient.acute_myeloid_leukemia_calgb_cytogenetics_risk_category" || param == "patient.gender"){
+    g = p + geom_bar(aes_(x=as.name(param))) + ggtitle(paste(as.name(param),"\ndistribution")) + theme(plot.title = element_text(lineheight=.8, face="bold",hjust = 0.5)) 
+  }
+  else{
+    g = p + geom_histogram(aes_(x=as.name(param)), bins = 15) + facet_wrap(~patient.acute_myeloid_leukemia_calgb_cytogenetics_risk_category)+  ggtitle(paste(param,"\ndistribution")) + 
+     theme(plot.title = element_text(lineheight=.8, face="bold", hjust = 0.5)) 
+    }
+  print(g)
+  }
+
+#boxplot - risk category vs gene expression
+#TP53INP1: known as a leukemic gene, we can see that gene expression increases in patients in risk category: "poor.
+#DNMT3A.1788: known as a preleukmic gene, we can see that the gene expression levels are the same between categories.
+#WT1.7490:known as a tumor suppressor, we can see the patients with higher expression levles are in risk category: "favorable"
+
+param = "patient.acute_myeloid_leukemia_calgb_cytogenetics_risk_category"
+for(gene in c("TP53INP1.94241","DNMT3A.1788","WT1.7490")){
+  X = clinical_data[,param]
+  Y = expression_data[,gene]
+  dat = data.frame(x=X,y=Y)
+  colnames(dat) = c(param,gene)
+  p = ggplot(dat,aes_(x=as.name(param), y=as.name(gene))) + geom_boxplot() + ggtitle(paste(param,"\nvs",gene)) + 
+     theme(plot.title = element_text(lineheight=.8, face="bold",hjust = 0.5)) 
+  print(p)
+}
+
+#3 genes with association with the clinical parameter: "patient.days_to_birth"
+# Method: spearman correlation
+  
+param_factor = "patient.gender"
+param = "patient.days_to_birth"
+counter_param = as.integer(0)
+X = clinical_data[,param]
+Z = clinical_data[,param_factor]
+for(gene in gene_list){
+  #compute the Spearman correlation between the expression levels of the gene and the parameter
+  Y = expression_data[,gene]
+  results = cor.test(x = X, y = Y, method = "spearman",exact = FALSE, na.rm = TRUE, conf.level = 0.97, use = "pairwise.complete.obs")
+  if(!is.na(results$p.value) & results$p.value < 0.005){
+    print(paste("parameter:",param, "gene: ", gene, "Test name:","spearman","R:",results$estimate,"P-value:",results$p.value))
+    counter_param = counter_param + 1
+    dat = data.frame(x=X,y=Y,z=Z)
+    colnames(dat) = c(param,gene,"gender")
+    p = ggplot(dat,aes_(x=as.name(names(dat)[1]), y=as.name(names(dat)[2]))) + geom_point(aes(col=gender)) + ggtitle(paste(param,"\nvs",gene)) + 
+     theme(plot.title = element_text(lineheight=.8, face="bold",hjust = 0.5)) 
+    print(p)
+    if (counter_param>2){
+          break
+    }
+  }
+}
+
+#3 genes with association with the clinical parameter: "patient.gender"
+# Method: Wilcoxon text
+
+param = "patient.gender"
+counter_param = as.integer(0)
+for(gene in colnames(expression_data)){
+  #compute the Wilcoxon correlation between the expression levels of the gene and the parameter
+  X = clinical_data[,param]
+  Y = expression_data[,gene]
+  results = wilcox.test(formula = Y~X)
+  # if the p-value is <0.05, show a boxplot comparing the expression levels. 
+  if(!is.na(results$p.value) & results$p.value < 0.001){
+    print(paste("parameter:",param,"gene",gene,"Test name:","Wilcoxon","W:",results$statistic,"P-value:",results$p.value))
+    counter_param = counter_param + 1
+    dat = data.frame(x=X,y=Y)
+    colnames(dat) = c(param,gene)
+    p = ggplot(dat,aes_(x=as.name(param), y=as.name(gene))) 
+    p = p + geom_boxplot() + ggtitle(paste(param,"\nvs",gene)) + 
+     theme(plot.title = element_text(lineheight=.8, face="bold",hjust = 0.5)) 
+    print(p)
+    if (counter_param>2){
+          break
+    }
+  }
+}
+```
+
+

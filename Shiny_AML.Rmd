@@ -1,0 +1,39 @@
+---
+title: "AML Shiny project"
+author: "Dikla Gelbard"
+date: "march 2017"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r , echo=FALSE}
+  navbarPage(
+    "AML apps",
+    tabPanel("clinical data - brief description",
+     shinyAppDir("intro_AML",
+  options = list(width = "120%", height = 550))
+    ),
+      tabPanel("kmeans", 
+          shinyAppDir("k_means",
+  options = list(width = "120%", height = 550))
+  ),
+        tabPanel("PCA and statistical tests", 
+          shinyAppDir("PCAandTests",
+  options = list(width = "120%", height = 550))
+  ),
+  tabPanel("multiple regression", 
+          shinyAppDir("regression",
+  options = list(width = "130%", height = 550))
+  ),
+  tabPanel("3 biological conclusions",HTML("<h3>3 biological conclusions</br> </h3><h4><p><b>1.From boxplot - risk category vs gene expression </b> w.From boxplot - risk category vs gene expression we can see 3 genes which have been expressed as expected:</br> <ul>   <li><b>TP53INP1:</b> is a leukemic gene, we can see that gene expression increases in patients in risk category: poor.</li></br><li><b>DNMT3A.1788:</b> is a preleukmic gene, we can see that the gene expression levels are the same between categories.</li></br><li><b>WT1.7490:</b>is a tumor suppressor, we can see the patients with higher expression levles are in risk category: favorable</li></ul></p><p><b>2.From kmeans clustering and from PCA analysis:</b> I didn't find any significant correlation between genes and clinical data (in kmeans I concetrated only in leukemic genes).</p><p><b>3.Gender effect:</b> I didn't find any relation between gender and other parameters (genes or clinical)</p></h4>"))
+  )
+```
+
+
+
+
